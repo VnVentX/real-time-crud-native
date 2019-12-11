@@ -1,17 +1,20 @@
 import React from "react";
 import axios from "axios";
-import { StyleSheet, Text, View, ScrollView } from "react-native";
+import { StyleSheet, Text, View, ScrollView, Button } from "react-native";
 import Constants from "expo-constants";
 import InputForm from "./components/InputForm";
-import DataList from "./components/DataList";
+import Search from "./components/Search";
+import { UserList } from "./components/UserList";
 
 export default class App extends React.Component {
   state = {
     user: [],
+    searchUser: [],
     username: "",
     description: "",
     id: "",
-    isEdditing: false
+    isEdditing: false,
+    isSearching: false
   };
 
   retrieveData = async () => {
@@ -23,7 +26,13 @@ export default class App extends React.Component {
       });
   };
 
+  //React Lifecycle Method
   componentDidMount() {
+    this.retrieveData();
+  }
+
+  //React Lifecycle Method
+  componentDidUpdate() {
     this.retrieveData();
   }
 
@@ -35,19 +44,19 @@ export default class App extends React.Component {
     this.setState({ description: value });
   };
 
-  delete(currentUser) {
+  onDelete = async currentUser => {
+    console.log("deleting");
     let id = currentUser._id;
     let username = currentUser.username;
-    axios
+    await axios
       .delete("https://anhtt-mern-stack-server.herokuapp.com/user/" + id)
       .then(res => {
-        this.retrieveData();
         console.log("Deleted user: " + username);
       })
       .catch(err => alert(err));
-  }
+  };
 
-  edit(currentUser) {
+  onEdit = currentUser => {
     let username = currentUser.username;
     let description = currentUser.description;
     let id = currentUser._id;
@@ -57,7 +66,7 @@ export default class App extends React.Component {
       id,
       isEdditing: true
     });
-  }
+  };
 
   onSubmit = e => {
     e.preventDefault();
@@ -66,7 +75,6 @@ export default class App extends React.Component {
       description: this.state.description,
       id: this.state.id
     };
-    console.log(detail);
     if (this.state.isEdditing) {
       const updateValue = {
         username: this.state.username,
@@ -80,7 +88,6 @@ export default class App extends React.Component {
         .then(res => {
           console.log(res);
           console.log(`Edited user ${updateValue.username}`);
-          this.retrieveData();
         });
       this.setState({
         username: "",
@@ -94,7 +101,6 @@ export default class App extends React.Component {
         .then(res => {
           console.log(res);
           console.log(`Updated user ${detail.username}`);
-          this.retrieveData();
         });
       this.setState({
         username: "",
@@ -103,19 +109,45 @@ export default class App extends React.Component {
     }
   };
 
+  onSearch = () => {
+    if (this.state.isSearching) {
+      axios
+        .get(
+          "https://anhtt-mern-stack-server.herokuapp.com/user/search/" +
+            this.state.username
+        )
+        .then(res => {
+          this.setState({ searchUser: res.data });
+        });
+      this.setState({
+        username: ""
+      });
+    }
+  };
+
   userList = () => {
     return this.state.user.map((currentUser, i) => {
       return (
-        <DataList
-          retrieveData={this.retrieveData}
+        <UserList
           user={currentUser}
           key={i}
-          onDelete={() => {
-            this.delete(currentUser);
-          }}
-          onEdit={() => {
-            this.edit(currentUser);
-          }}
+          onDelete={this.onDelete}
+          onEdit={this.onEdit}
+          isSearching={this.state.isSearching}
+        />
+      );
+    });
+  };
+
+  searchList = () => {
+    return this.state.searchUser.map((currentUser, i) => {
+      return (
+        <UserList
+          user={currentUser}
+          key={i}
+          onDelete={this.onDelete}
+          onEdit={this.onEdit}
+          isSearching={this.state.isSearching}
         />
       );
     });
@@ -124,19 +156,55 @@ export default class App extends React.Component {
   render() {
     return (
       <View style={styles.container}>
-        <InputForm
-          delete={this.delete}
-          handleUsernameChange={this.handleUsernameChange}
-          username={this.state.username}
-          handleDescriptionChange={this.handleDescriptionChange}
-          description={this.state.description}
-          onSubmit={this.onSubmit}
-          isEdditing={this.state.isEdditing}
-        />
-        {this.userList().length > 0 ? (
-          <ScrollView>{this.userList()}</ScrollView>
+        <View style={styles.statusBar}></View>
+        {this.state.isSearching ? (
+          <>
+            <Button
+              title="Back To Add User"
+              onPress={() =>
+                this.setState({
+                  isSearching: !this.state.isSearching
+                })
+              }
+            />
+            <Search
+              handleUsernameChange={this.handleUsernameChange}
+              username={this.state.username}
+              onSearch={this.onSearch}
+            />
+            <Text style={{ marginTop: 10, fontSize: 20, fontWeight: "bold" }}>
+              List User
+            </Text>
+            <ScrollView>{this.searchList()}</ScrollView>
+          </>
         ) : (
-          <Text>This List is currently empty!!!</Text>
+          <>
+            <Button
+              title="Search A User"
+              onPress={() => {
+                this.setState({
+                  isSearching: !this.state.isSearching,
+                  searchUser: []
+                });
+              }}
+            />
+            <InputForm
+              handleUsernameChange={this.handleUsernameChange}
+              username={this.state.username}
+              handleDescriptionChange={this.handleDescriptionChange}
+              description={this.state.description}
+              onSubmit={this.onSubmit}
+              isEdditing={this.state.isEdditing}
+            />
+            <Text style={{ marginTop: 10, fontSize: 20, fontWeight: "bold" }}>
+              List User
+            </Text>
+            {this.userList().length > 0 ? (
+              <ScrollView>{this.userList()}</ScrollView>
+            ) : (
+              <Text>This List is currently empty!!!</Text>
+            )}
+          </>
         )}
       </View>
     );
@@ -146,7 +214,10 @@ export default class App extends React.Component {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    paddingTop: Constants.statusBarHeight
+    backgroundColor: "#fff"
+  },
+  statusBar: {
+    height: Constants.statusBarHeight,
+    backgroundColor: "yellow"
   }
 });
