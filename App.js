@@ -7,22 +7,35 @@ import Search from "./components/Search";
 import { UserList } from "./components/UserList";
 
 export default class App extends React.Component {
+  signal = axios.CancelToken.source();
+
   state = {
+    isLoading: false,
+    isEdditing: false,
+    isSearching: false,
     user: [],
     searchUser: [],
     username: "",
     description: "",
-    id: "",
-    isEdditing: false,
-    isSearching: false
+    id: ""
   };
 
   retrieveData = async () => {
+    this.setState({ isLoading: true });
     await axios
-      .get("https://anhtt-mern-stack-server.herokuapp.com/user/")
+      .get("https://anhtt-mern-stack-server.herokuapp.com/user/", {
+        cancelToken: this.signal.token
+      })
       .then(res => {
         const user = res.data;
-        this.setState({ user });
+        this.setState({ user, isLoading: true });
+      })
+      .catch(err => {
+        if (axios.isCancel(err)) {
+          console.log(err.message);
+        } else {
+          this.setState({ isLoading: false });
+        }
       });
   };
 
@@ -31,9 +44,8 @@ export default class App extends React.Component {
     this.retrieveData();
   }
 
-  //React Lifecycle Method
-  componentDidUpdate() {
-    this.retrieveData();
+  componentWillUnmount() {
+    this.signal.cancel("Api is being canceled");
   }
 
   handleUsernameChange = value => {
@@ -51,6 +63,7 @@ export default class App extends React.Component {
     await axios
       .delete("https://anhtt-mern-stack-server.herokuapp.com/user/" + id)
       .then(res => {
+        this.retrieveData();
         console.log("Deleted user: " + username);
       })
       .catch(err => alert(err));
@@ -86,26 +99,24 @@ export default class App extends React.Component {
           updateValue
         )
         .then(res => {
-          console.log(res);
-          console.log(`Edited user ${updateValue.username}`);
+          this.retrieveData();
+          this.setState({
+            username: "",
+            description: "",
+            id: "",
+            isEdditing: false
+          });
         });
-      this.setState({
-        username: "",
-        description: "",
-        id: "",
-        isEdditing: false
-      });
     } else {
       axios
         .post("https://anhtt-mern-stack-server.herokuapp.com/user/", detail)
         .then(res => {
-          console.log(res);
-          console.log(`Updated user ${detail.username}`);
+          this.retrieveData();
+          this.setState({
+            username: "",
+            description: ""
+          });
         });
-      this.setState({
-        username: "",
-        description: ""
-      });
     }
   };
 
